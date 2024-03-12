@@ -13,6 +13,8 @@ SetTitleMatchMode, Slow
 ; Explorer-based "save" and "load" boxes, from any program, as ExplorerGroup member
 GroupAdd, ExplorerGroup, ahk_class #32770 
 
+DetectHiddenWindows, On
+
 ; Recommended for new scripts due to its superior speed and reliability. (?)
 SendMode Input  
 
@@ -776,9 +778,6 @@ if (numlock) {
 }
 return
 
-; Shift + NP3 
-F17 & N::Send, ^+{Tab}
-
 ; Obsidian
 toggleNP5=true;
 F18 & W::
@@ -810,31 +809,27 @@ return
 	
 ; Outlook
 F18 & T::
-if (numlock) {
-        
-    IfWinNotExist, ahk_exe olk.exe
-        Run, "olk.exe", UseErrorLevel
-    else {
-        windows6 := []
-        WinGet, idList, List
-        Loop, %idList%
-        {
-            thisID := idList%A_Index%
-            WinGet, thisProcess, ProcessName, ahk_id %thisID%
-            if (thisProcess = "olk.exe")
-                windows6.Push(thisID)
+IfWinNotExist, ahk_exe olk.exe
+    Run, "olk.exe", UseErrorLevel
+else {
+    windows6 := []
+    WinGet, idList, List
+    Loop, %idList%
+    {
+        thisID := idList%A_Index%
+        WinGet, thisProcess, ProcessName, ahk_id %thisID%
+        if (thisProcess = "olk.exe") {
+            windows6.Push(thisID)
         }
-        WinGet, activeProcessName, ProcessName, A
-        if (activeProcessName = "olk.exe") {
-            ; cycle
-            maxIndex := windows6.MaxIndex()
-            thisID := windows6[maxIndex]
-        } else
-            thisID := windows6[1]
-        WinActivate, ahk_id %thisID%
     }
-} else {
-    Send, 7
+    WinGet, activeProcessName, ProcessName, A
+    if (activeProcessName = "olk.exe") {
+        ; cycle
+        maxIndex := windows6.MaxIndex()
+        thisID := windows6[maxIndex]
+    } else
+        thisID := windows6[1]
+    WinActivate, ahk_id %thisID%
 }
 return
 
