@@ -404,6 +404,91 @@ focusWinUnderCursor() {
 
 ;SECTION Misc 
 
+;TODO: special
+; :::a::
+;     ;Special shortcut
+; Return
+
+; ::remapthis::tothis
+
+:*::datf::
+    Send, %A_DD% %A_MMMM% %A_YYYY%
+Return
+
+:*::smile::🙂
+::smile::🙂
+
+
+; ''' > ``
+; :*:'''::``````
+
+:*::date::
+    Send,  %A_DD%
+    Send, /
+    Send, %A_MM%
+    Send, /
+    year := SubStr(A_YYYY, -1)
+    Send, %year%
+return
+
+; :::date::
+;     Send,  %A_DD%
+;     Send, /
+;     Send, %A_MM%
+;     Send, /
+;     year := SubStr(A_YYYY, -1)
+;     Send, %year%
+; Return
+
++WheelDown::
+    AdjustScreenBrightness(-5)
+Return
+
++WheelUp::
+    AdjustScreenBrightness(5)
+Return
+
+^WheelDown::
+    SoundSet -3
+    VolumeOSD()
+Return
+
+^WheelUp::
+    SoundSet +3
+    VolumeOSD()
+Return
+
+
+AdjustScreenBrightness(Offset) {
+    static wmi := ComObjGet("winmgmts:\\.\root\WMI")
+        , last := wmi.ExecQuery("SELECT * FROM WmiMonitorBrightness").ItemIndex(0).CurrentBrightness
+    level := Min(100, Max(1, last + Offset))
+    if (level != last) {
+        last := level
+        wmi.ExecQuery("SELECT * FROM WmiMonitorBrightnessMethods").ItemIndex(0).WmiSetBrightness(0, level)
+    }
+}
+
+VolumeOSD() {
+	static PostMessagePtr := DllCall("GetProcAddress", "Ptr", DllCall("GetModuleHandle", "Str", "user32.dll", "Ptr"), "AStr", A_IsUnicode ? "PostMessageW" : "PostMessageA", "Ptr")
+	 ,WM_SHELLHOOK := DllCall("RegisterWindowMessage", "Str", "SHELLHOOK", "UInt")
+	static FindWindow := DllCall("GetProcAddress", "Ptr", DllCall("GetModuleHandle", "Str", "user32.dll", "Ptr"), "AStr", A_IsUnicode ? "FindWindowW" : "FindWindowA", "Ptr")
+	HWND := DllCall(FindWindow, "Str", "NativeHWNDHost", "Str", "", "Ptr")
+	IF !(HWND) {
+		try IF ((shellProvider := ComObjCreate("{C2F03A33-21F5-47FA-B4BB-156362A2F239}", "{00000000-0000-0000-C000-000000000046}"))) {
+			try IF ((flyoutDisp := ComObjQuery(shellProvider, "{41f9d2fb-7834-4ab6-8b1b-73e74064b465}", "{41f9d2fb-7834-4ab6-8b1b-73e74064b465}"))) {
+				DllCall(NumGet(NumGet(flyoutDisp+0)+3*A_PtrSize), "Ptr", flyoutDisp, "Int", 0, "UInt", 0)
+				 ,ObjRelease(flyoutDisp)
+			}
+			ObjRelease(shellProvider)
+		}
+		HWND := DllCall(FindWindow, "Str", "NativeHWNDHost", "Str", "", "Ptr")
+	}
+	DllCall(PostMessagePtr, "Ptr", HWND, "UInt", WM_SHELLHOOK, "Ptr", 0x37, "Ptr", 0)
+}
+
+
+
 F18 & O::Run, explorer.exe "C:\Users\tungsten\Desktop"
 
 F18 & B::
@@ -427,10 +512,16 @@ return
 #Numpad6::Media_Next
 
 ;Ctrl & Numpad 8: Volume Up
-#Numpad8::SoundSet +3
+#Numpad8::
+    SoundSet +3
+    VolumeOSD()
+Return
 
 ;Ctrl & Numpad 2: Volume Down
-#Numpad2::SoundSet -3
+#Numpad2::
+    SoundSet -3
+    VolumeOSD()
+Return
 
 ;Ctrl & Numpad 5: Play/Pause Track
 #Numpad5::Media_Play_Pause
@@ -445,31 +536,31 @@ return
 
 
   
-AdjustScreenBrightness(step) {
-    service := "winmgmts:{impersonationLevel=impersonate}!\\.\root\WMI"
-    monitors := ComObjGet(service).ExecQuery("SELECT * FROM WmiMonitorBrightness WHERE Active=TRUE")
-    monMethods := ComObjGet(service).ExecQuery("SELECT * FROM wmiMonitorBrightNessMethods WHERE Active=TRUE")
-    minBrightness := 5  ; level below this is identical to this
+; AdjustScreenBrightness(step) {
+;     service := "winmgmts:{impersonationLevel=impersonate}!\\.\root\WMI"
+;     monitors := ComObjGet(service).ExecQuery("SELECT * FROM WmiMonitorBrightness WHERE Active=TRUE")
+;     monMethods := ComObjGet(service).ExecQuery("SELECT * FROM wmiMonitorBrightNessMethods WHERE Active=TRUE")
+;     minBrightness := 5  ; level below this is identical to this
 
-    for i in monitors {
-        curt := i.CurrentBrightness
-        break
-    }
-    if (curt < minBrightness)  ; parenthesis is necessary here
-        curt := minBrightness
-    toSet := curt + step
-    if (toSet > 100)
-        return
-    if (toSet < minBrightness)
-        toSet := minBrightness
+;     for i in monitors {
+;         curt := i.CurrentBrightness
+;         break
+;     }
+;     if (curt < minBrightness)  ; parenthesis is necessary here
+;         curt := minBrightness
+;     toSet := curt + step
+;     if (toSet > 100)
+;         return
+;     if (toSet < minBrightness)
+;         toSet := minBrightness
         
     
 
-    for i in monMethods {
-        i.WmiSetBrightness(1, toSet)
-        break
-    }
-}
+;     for i in monMethods {
+;         i.WmiSetBrightness(1, toSet)
+;         break
+;     }
+; }
 
 ; Alt = Mouse
 AltPressed := false
@@ -520,10 +611,13 @@ LCtrl & `;::Send, {)}
 LAlt & ,::Send, {{}
 LAlt & `;::Send, {}}
 LWin & ,::Send, {[}
-LWin & `;::Send, {]}
+;LWin & `;::Send, {]}
 RAlt & ,::Send, {<}
 RAlt & `;::Send, {>}
 LShift & !::Send, {|}
+
+
+
 
 ; Windows Notification
 ;#Esc::#n
@@ -547,65 +641,14 @@ windows8=[]
 windows9=[]
 
 F18 & U::
-IfWinNotExist, ahk_exe stm32cubeide.exe
-	if (A_PriorHotKey = A_ThisHotKey && A_TimeSincePriorHotkey < 200)
-		Run, "C:\ST\STM32CubeIDE_1.14.1\STM32CubeIDE\stm32cubeide.exe", UseErrorLevel
-WinGet, activeProcessName, ProcessName, A
-if (activeProcessName = "stm32cubeide.exe")
-{
-	; IfWinNotExist, ahk_exe STM32CubeMonitor.exe
-	; 	Run, "C:\Users\tungsten\AppData\Local\STM32CubeMonitor\STM32CubeMonitor.exe", UseErrorLevel
-	; else 
-		WinActivate ahk_exe STM32CubeMonitor.exe
-	main5:=false
-} else if (activeProcessName = "STM32CubeMonitor.exe") {
-	WinActivate ahk_exe stm32cubeide.exe
-	main5:=true
-} else if main5 {
-	IfWinExist, ahk_exe stm32cubeide.exe
-		WinActivate ahk_exe stm32cubeide.exe
-		main5:=true
-} else {
-	IfWinExist, ahk_exe STM32CubeMonitor.exe
-	{
-		WinActivate ahk_exe STM32CubeMonitor.exe
-		main5:=false
-	} else {
-		WinActivate ahk_exe stm32cubeide.exe
-		main5:=true
-	}
-}
+    appSwitchSTM32()
 return 
 
 
 ; Windows Terminal
 F18 & I::
     if (numlock) {
-        WinGetClass, activeClass, A
-        if (activeClass = "CASCADIA_HOSTING_WINDOW_CLASS") {
-            windows0 := []
-            WinGet, idList, List
-            Loop, %idList%
-            {
-                thisID := idList%A_Index%
-                WinGetTitle, thisTitle, ahk_id %thisID%
-                if (thisTitle = "Terminal")
-                {
-                    windows0.Push(thisID)  
-                }
-            }
-            WinGetClass, activeClass, A
-            if (activeClass = "CASCADIA_HOSTING_WINDOW_CLASS") {
-                ; cycle
-                maxIndex := windows0.MaxIndex()
-                thisID := windows0[maxIndex]
-            } else
-                ; last
-                thisID := windows0[1]
-            WinActivate, ahk_id %thisID%
-        } else {
-            WinActivate, ahk_class CASCADIA_HOSTING_WINDOW_CLASS
-        }
+        appSwitchTerminal()
     } else {
         Send, 0
     }
@@ -614,6 +657,72 @@ return
 ; Google Chrome (except ChatGPT) 
 F18 & Q::
 if (numlock) {
+    appSwitchChrome()
+} else {
+    Send, 1
+}
+return
+
+appSwitchSTM32() {
+    IfWinNotExist, ahk_exe stm32cubeide.exe
+        if (A_PriorHotKey = A_ThisHotKey && A_TimeSincePriorHotkey < 200)
+            Run, "C:\ST\STM32CubeIDE_1.14.1\STM32CubeIDE\stm32cubeide.exe", UseErrorLevel
+    WinGet, activeProcessName, ProcessName, A
+    if (activeProcessName = "stm32cubeide.exe")
+    {
+        ; IfWinNotExist, ahk_exe STM32CubeMonitor.exe
+        ; 	Run, "C:\Users\tungsten\AppData\Local\STM32CubeMonitor\STM32CubeMonitor.exe", UseErrorLevel
+        ; else 
+            WinActivate ahk_exe STM32CubeMonitor.exe
+        main5:=false
+    } else if (activeProcessName = "STM32CubeMonitor.exe") {
+        WinActivate ahk_exe stm32cubeide.exe
+        main5:=true
+    } else if main5 {
+        IfWinExist, ahk_exe stm32cubeide.exe
+            WinActivate ahk_exe stm32cubeide.exe
+            main5:=true
+    } else {
+        IfWinExist, ahk_exe STM32CubeMonitor.exe
+        {
+            WinActivate ahk_exe STM32CubeMonitor.exe
+            main5:=false
+        } else {
+            WinActivate ahk_exe stm32cubeide.exe
+            main5:=true
+        }
+    }
+}
+
+appSwitchTerminal() {
+    WinGetClass, activeClass, A
+    if (activeClass = "CASCADIA_HOSTING_WINDOW_CLASS") {
+        windows0 := []
+        WinGet, idList, List
+        Loop, %idList%
+        {
+            thisID := idList%A_Index%
+            WinGetTitle, thisTitle, ahk_id %thisID%
+            if (thisTitle = "Terminal")
+            {
+                windows0.Push(thisID)  
+            }
+        }
+        WinGetClass, activeClass, A
+        if (activeClass = "CASCADIA_HOSTING_WINDOW_CLASS") {
+            ; cycle
+            maxIndex := windows0.MaxIndex()
+            thisID := windows0[maxIndex]
+        } else
+            ; last
+            thisID := windows0[1]
+        WinActivate, ahk_id %thisID%
+    } else {
+        WinActivate, ahk_class CASCADIA_HOSTING_WINDOW_CLASS
+    }
+}
+
+appSwitchChrome() {
     windows1 := []
     WinGet, idList, List  
     Loop, %idList%
@@ -651,14 +760,307 @@ if (numlock) {
             WinActivate, ahk_id %thisID%
         }
     }
-} else {
-    Send, 1
+    return
 }
+
+; ~LWin::
+;     mousegetpos xpos1,ypos1
+;     settimer,gtrack,1
+; return
+
+; LWin up::
+;     settimer,gtrack,off
+;     if (gtrack = ""){
+;     }
+;     else if (gtrack = "r"){
+;         appSwitchVSCode()
+;     }
+;     else if (gtrack = "l"){
+;         appSwitchObsidian2()
+;     }
+;     else if (gtrack = "u"){
+;         appSwitchChrome()
+;     }
+;     else if (gtrack = "d"){
+;         appSwitchGPT()
+;     }
+;     else if (gtrack = "lu"){
+;         appSwitchOutlook()
+;     }
+;     else if (gtrack = "rd"){
+;         appSwitchExplorer()
+;     }
+;     else if (gtrack = "ru"){
+;         appSwitchTerminal()
+;     }
+;     else if (gtrack = "ld"){
+;         appSwitchSTM32()
+;     }
+;     gtrack=
+; return
+
+
+; Grid select
+; ~LWin:: ; Launch_Media
+;     dirX=0
+;     dirY=0
+;     MouseGetPos, StartX, StartY
+;     While GetKeyState("LWin", "P")
+;     {
+;         ; Determiner position sur grille
+;         MouseGetPos, EndX, EndY
+;         PixelsMovedX := EndX - StartX
+;         PixelsMovedY := EndY - StartY
+;         if(PixelsMovedX > 10) {
+;             ; right
+;             dirX := 1
+;         } else if (PixelsMovedX < -10) {
+;             ; left
+;             dirX := -1
+;         }
+;         if(PixelsMovedY > 10) {
+;             ; down
+;             dirY := -1
+;         } else if (PixelsMovedY < -10) {
+;             ; up
+;             dirY := 1
+;         }
+        
+;         ; Switch
+;         if (dirX = 1 && dirY = 1)
+;             appSwitchTerminal()
+;         else if (dirX = 1 && dirY = -1)
+;             appSwitchExplorer
+;         ToolTip % "" dirX " " dirY
+;     }
+;     ToolTip
+; return
+
+~LWin:: ; Launch_Media
+    dirX=0
+    dirY=0
+    direction=""
+    app=""
+    MouseGetPos, StartX, StartY
+    While GetKeyState("LWin", "P")
+    {
+        ; Get position on grid
+        MouseGetPos, EndX, EndY
+        PixelsMovedX := EndX - StartX
+        PixelsMovedY := EndY - StartY
+       
+        angle := atan2(PixelsMovedY, PixelsMovedX) * 180 / 3.141592653589793  ; Convertir en degrés
+        distance := sqrt((PixelsMovedX * PixelsMovedX) + (PixelsMovedY * PixelsMovedY))
+        ; ToolTip % "" angle " " distance
+
+        ; Get direction
+        ; up = -90
+        ; down = 90
+        ; right = 0
+        ; left = 180 = -180
+        
+        if (distance > 5 && distance < 150) {
+            if (angle >= 0 && angle < 22.5) {
+                direction = "rr"
+                if (app != "vscode")
+                    app="vscode"
+                    appSwitchVSCode()
+            }
+            else if (angle >= 22.5 && angle < 67.5) {
+                direction = "dr"
+                if (app != "explorer")
+                    app="explorer"
+                    appSwitchExplorer()
+            }
+            else if (angle >= 67.5 && angle < 112.5) {
+                direction = "dd"
+                if (app != "gpt")
+                    app="gpt"
+                    appSwitchGPT()
+            }
+            else if (angle >= 112.5 && angle < 157.5) {
+                direction = "dl"
+                if (app != "stm32")
+                    app="stm32"
+                    appSwitchSTM32()
+            }
+            else if (angle >= 157.5 && angle <= 180) {
+                direction = "ll"
+                if (app != "obsidian")
+                    app="obsidian"
+                    appSwitchObsidian2()
+            }
+            else if (angle >= -180 && angle < -157.5) {
+                direction = "ll"
+                if (app != "obsidian")
+                    app="obsidian"
+                    appSwitchObsidian2()
+            }
+            else if (angle >= -157.5 && angle < -112.5) {
+                direction = "ul"
+                if (app != "outlook")
+                    app="outlook"
+                    appSwitchOutlook()
+            }
+            else if (angle >= -112.5 && angle < -67.5) {
+                direction = "uu"
+                if (app != "chrome")
+                    app="chrome"
+                    appSwitchChrome()
+            }
+            else if (angle >= -67.5 && angle < -22.5) {
+                direction = "ur"
+                if (app != "term")
+                    app="term"
+                    appSwitchTerminal()
+            }
+            else {
+                direction = "rr"
+                if (app != "vscode")
+                    app="vscode"
+                    appSwitchVSCode()
+            }
+        }
+        ;ToolTip % "" direction
+    }
+    ;ToolTip
 return
+
+
+gtrack:
+    mousegetpos xpos2, ypos2
+    dx := xpos2 - xpos1
+    dy := ypos2 - ypos1
+    angle := atan2(dy, dx) * 180 / 3.141592653589793  ; Convertir en degrés
+
+    ; Déterminer la direction en fonction de l'angle
+    if (angle >= -22.5 && angle < 22.5)
+        track := "r"
+    else if (angle >= 22.5 && angle < 67.5)
+        track := "rd"
+    else if (angle >= 67.5 && angle < 112.5)
+        track := "d"
+    else if (angle >= 112.5 && angle < 157.5)
+        track := "ld"
+    else if (angle >= 157.5 || angle < -157.5)
+        track := "l"
+    ; else if (angle >= -157.5 && angle < -112.5)
+    ;     track := "lu"
+    ; else if (angle >= -112.5 && angle < -67.5)
+    ;     track := "u"
+    else if (angle >= -157.5 && angle < -122.5)
+        track := "lu"
+    else if (angle >= -122.5 && angle < -47.5)
+        track := "u"
+    else
+        track := "ru"
+
+    if (track != SubStr(gtrack, 0)) && (abs(dy) > 10 || abs(dx) > 10)
+        gtrack := track
+    xpos1 := xpos2, ypos1 := ypos2
+return
+
+atan2(y,x) { ; y then x
+    if (x > 0)
+      return atan(y/x)
+    if (x < 0) ; && (y <> 0)
+      return atan(y/x) + 3.1415926535898 * ((y >= 0) ? 1.0 : -1.0)
+    if (y <> 0) ; && (x = 0)
+      return 1.5707963267949 * ((y >= 0) ? 1.0 : -1.0)
+    return 0.0
+  } ; by Raccoon 2019
+
+
+; Slide to switch tab (todo)
+RCtrl::
+    StartX := 0
+    EndX := 0
+    mouseStep := 100
+    MouseGetPos, StartX, StartY
+    PixelsMoved := 0
+    nTimeShifted := 0
+    While GetKeyState("RCtrl", "P")
+    {
+        MouseGetPos, EndX, EndY
+        PixelsMoved := EndX - StartX
+        ref := PixelsMoved - nTimeShifted * mouseStep
+        if(ref < - mouseStep) {
+            Send, ^+{Tab}
+            nTimeShifted := nTimeShifted - 1
+        } else if (ref > mouseStep) {
+            Send, ^{Tab}
+            nTimeShifted := nTimeShifted + 1
+        }
+        ; Toasty(nTimeShifted)
+    }
+return
+
+
+;     mouseStep := 100
+;     MouseGetPos, StartX, StartY
+;     Moved := 0
+;     While GetKeyState("F14", "P")
+;     {
+;         MouseGetPos, EndX, EndY
+;         PixelsMoved := EndX - StartX
+;         if (PixelsMoved - Moved > mouseStep) {
+;             Moved := Moved + mouseStep
+;             Send, ^{Tab}
+;         }
+;         else if (Moved - PixelsMoved > mouseStep) {
+;             Moved := Moved - mouseStep
+;             Send, ^+{Tab}
+;         }
+
+;     }
+; return
+
 
 ; ChatGPT
 F18 & G::
 if (numlock) {    
+    appSwitchGPT()
+}
+return
+
+; VSCode
+shift3:=false
+F18 & E::
+if (numlock) {
+    appSwitchVSCode()
+} else {
+    Send, 3
+}
+return
+
+
+; Explorer
+F18 & R::
+if (numlock) {
+    appSwitchExplorer()
+} else {
+    ;Send, {LWin down} {Numpad4} {LWin up}
+}
+return
+
+
+; Obsidian
+toggleNP5=true;
+F18 & W::
+if (numlock) {
+    appSwitchObsidian()
+} else {
+    Send, 5
+}
+return 
+
+
+; Outlook
+F18 & T::
+    appSwitchOutlook()
+return
+
+appSwitchGPT() {
     WinGetTitle, thisTitle, ahk_id %thisID%
     WinGet, activeProcessName, ProcessName, A
     if ((InStr(thisTitle, "@GPT") || InStr(thisTitle, "Anthropic Console")) && (activeProcessName = "chrome.exe"))
@@ -701,12 +1103,7 @@ if (numlock) {
         }
     }
 }
-return
-
-; VSCode
-shift3:=false
-F18 & E::
-if (numlock) {
+appSwitchVSCode() {
     IfWinNotExist, ahk_exe Code.exe
     {
         ; WinGetTitle, activeTitle, A
@@ -748,15 +1145,8 @@ if (numlock) {
         }
         WinActivate, ahk_id %thisID%  ; Déplace le focus sur la fenêtre de Visual Studio Code
     }
-} else {
-    Send, 3
 }
-return
-
-; Explorer
-F18 & R::
-if (numlock) {
-        
+appSwitchExplorer() {
     IfWinNotExist ahk_class CabinetWClass
     {
         ; WinGet, activeProcessName, ProcessName, A
@@ -773,15 +1163,9 @@ if (numlock) {
         else
             WinActivate ahk_class CabinetWClass ;you have to use WinActivatebottom if you didn't create a window group.
     }
-} else {
-    ;Send, {LWin down} {Numpad4} {LWin up}
 }
-return
 
-; Obsidian
-toggleNP5=true;
-F18 & W::
-if (numlock) {
+appSwitchObsidian() {
     WinGet, activeProcessName, ProcessName, A
     IfWinNotExist, ahk_exe Obsidian.exe
     {
@@ -799,39 +1183,51 @@ if (numlock) {
                 Send ^m
                 MouseMove, 1110, 490
             }
-        } else
+        } else {
             WinActivate ahk_exe Obsidian.exe
         }
-} else {
-    Send, 5
+    }
 }
-return 
-	
-; Outlook
-F18 & T::
-IfWinNotExist, ahk_exe olk.exe
-    Run, "olk.exe", UseErrorLevel
-else {
-    windows6 := []
-    WinGet, idList, List
-    Loop, %idList%
+
+appSwitchObsidian2() {
+    WinGet, activeProcessName, ProcessName, A
+    IfWinNotExist, ahk_exe Obsidian.exe
     {
-        thisID := idList%A_Index%
-        WinGet, thisProcess, ProcessName, ahk_id %thisID%
-        if (thisProcess = "olk.exe") {
-            windows6.Push(thisID)
+        if (A_PriorHotKey = A_ThisHotKey && A_TimeSincePriorHotkey < 200) {
+            Run, "C:\Users\tungsten\AppData\Local\Programs\obsidian\Obsidian.exe", UseErrorLevel
+        }
+    } else {
+        WinGet, activeProcessName, ProcessName, A
+        if (activeProcessName != "Obsidian.exe") {
+            WinActivate ahk_exe Obsidian.exe
         }
     }
-    WinGet, activeProcessName, ProcessName, A
-    if (activeProcessName = "olk.exe") {
-        ; cycle
-        maxIndex := windows6.MaxIndex()
-        thisID := windows6[maxIndex]
-    } else
-        thisID := windows6[1]
-    WinActivate, ahk_id %thisID%
 }
-return
+
+appSwitchOutlook() {
+    IfWinNotExist, ahk_exe olk.exe
+    Run, "olk.exe", UseErrorLevel
+    else {
+        windows6 := []
+        WinGet, idList, List
+        Loop, %idList%
+        {
+            thisID := idList%A_Index%
+            WinGet, thisProcess, ProcessName, ahk_id %thisID%
+            if (thisProcess = "olk.exe") {
+                windows6.Push(thisID)
+            }
+        }
+        WinGet, activeProcessName, ProcessName, A
+        if (activeProcessName = "olk.exe") {
+            ; cycle
+            maxIndex := windows6.MaxIndex()
+            thisID := windows6[maxIndex]
+        } else
+            thisID := windows6[1]
+        WinActivate, ahk_id %thisID%
+    }
+}
 
 ; Reload
 LAlt & Numpad9::
